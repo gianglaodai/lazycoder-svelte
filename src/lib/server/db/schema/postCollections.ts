@@ -1,12 +1,4 @@
-import {
-	pgTable,
-	serial,
-	integer,
-	text,
-	timestamp,
-	uuid,
-	check
-} from 'drizzle-orm/pg-core';
+import { pgTable, serial, integer, text, timestamp, uuid, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // Post collections table
@@ -34,5 +26,5 @@ export const postCollections = pgTable(
 	}
 );
 
-// Export type
-export type PostCollection = typeof postCollections.$inferSelect;
+// Export types
+export type PostCollectionOrm = typeof postCollections.$inferSelect;

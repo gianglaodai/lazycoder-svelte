@@ -7,11 +7,21 @@ import {
 	uuid,
 	uniqueIndex,
 	index,
-	check
+	check,
+	pgEnum
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { users } from './users';
 import { postTypes } from './postTypes';
+
+// Post status enum
+export const postStatusEnum = pgEnum('post_status', [
+	'DRAFT',
+	'REVIEW',
+	'PUBLISHED',
+	'ARCHIVED',
+	'DELETED'
+]);
 
 // Posts table
 export const posts = pgTable(
@@ -26,7 +36,7 @@ export const posts = pgTable(
 		title: text('title').notNull(),
 		summary: text('summary'),
 		content: text('content'),
-		status: integer('status').notNull().default(0),
+		status: postStatusEnum('status').notNull().default('DRAFT'),
 		visibility: text('visibility').notNull().default('public'),
 		format: text('format').notNull().default('markdown'),
 		publishedAt: timestamp('published_at', { withTimezone: true }),
@@ -40,7 +50,7 @@ export const posts = pgTable(
 	(table) => {
 		return {
 			typeSlugUnique: uniqueIndex('UN_posts_type_slug').on(table.typeId, table.slug),
-			statusCheck: check('CK_posts_status', sql`status IN (0,1,2)`),
+			// Status check is no longer needed as the enum type enforces valid values
 			slugCheck: check('CK_posts_slug', sql`slug ~ '^[a-z0-9]+([a-z0-9-]*[a-z0-9])?$'`),
 			visibilityCheck: check(
 				'CK_posts_visibility',
@@ -61,5 +71,5 @@ export const posts = pgTable(
 	}
 );
 
-// Export type
-export type Post = typeof posts.$inferSelect;
+// Export types
+export type PostOrm = typeof posts.$inferSelect;

@@ -1,12 +1,4 @@
-import {
-	pgTable,
-	serial,
-	integer,
-	text,
-	timestamp,
-	uuid,
-	uniqueIndex
-} from 'drizzle-orm/pg-core';
+import { pgTable, serial, integer, text, timestamp, uuid, uniqueIndex } from 'drizzle-orm/pg-core';
 
 // Attributes table
 export const attributes = pgTable(
@@ -31,5 +23,5 @@ export const attributes = pgTable(
 	}
 );
 
-// Export type
-export type Attribute = typeof attributes.$inferSelect;
+// Export types
+export type AttributeOrm = typeof attributes.$inferSelect;

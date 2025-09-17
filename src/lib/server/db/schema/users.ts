@@ -1,25 +1,21 @@
-import {
-	pgTable,
-	serial,
-	integer,
-	text,
-	timestamp,
-	uuid
-} from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, timestamp, uuid, pgEnum } from 'drizzle-orm/pg-core';
 import { citext } from '../extensions';
 
-// Users table
+// User role enum
+export const userRoleEnum = pgEnum('user_role', ['USER', 'ADMIN']);
+
+// Users table - updated for Lucia compatibility
 export const users = pgTable('users', {
-	id: serial('id').primaryKey(),
+	id: text('id').primaryKey(), // Changed to text for Lucia compatibility
 	uid: uuid('uid').notNull().unique(),
 	version: integer('version').notNull().default(0),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 	updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 	username: citext('username').notNull().unique(),
 	email: citext('email').notNull().unique(),
-	password: text('password').notNull(),
-	role: integer('role').notNull().default(0)
+	role: userRoleEnum('role').notNull().default('USER')
+	// Password is now handled by Lucia keys table
 });
 
-// Export type
-export type User = typeof users.$inferSelect;
+// Export types
+export type UserOrm = typeof users.$inferSelect;

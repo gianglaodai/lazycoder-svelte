@@ -1,9 +1,4 @@
-import {
-	pgTable,
-	integer,
-	index,
-	primaryKey
-} from 'drizzle-orm/pg-core';
+import { pgTable, integer, index, primaryKey } from 'drizzle-orm/pg-core';
 import { posts } from './posts';
 import { terms } from './terms';
 
@@ -27,5 +22,5 @@ export const postTerms = pgTable(
 	}
 );
 
-// Export type
-export type PostTerm = typeof postTerms.$inferSelect;
+// Export types
+export type PostTermOrm = typeof postTerms.$inferSelect;

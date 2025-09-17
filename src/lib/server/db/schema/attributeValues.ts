@@ -44,5 +44,5 @@ export const attributeValues = pgTable(
 	}
 );
 
-// Export type
-export type AttributeValue = typeof attributeValues.$inferSelect;
+// Export types
+export type AttributeValueOrm = typeof attributeValues.$inferSelect;

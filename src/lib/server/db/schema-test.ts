@@ -1,16 +1,16 @@
 // Import all tables from schema
 import {
-  attributes,
-  attributeValues,
-  users,
-  postTypes,
-  posts,
-  postCollections,
-  postTaxonomies,
-  terms,
-  postCollectionItems,
-  postTerms,
-  postRelations
+	attributes,
+	attributeValues,
+	users,
+	postTypes,
+	posts,
+	postCollections,
+	postTaxonomies,
+	terms,
+	postCollectionItems,
+	postTerms,
+	postRelations
 } from './schema/index';
 
 // This is just a test file to verify that the schema imports work correctly
@@ -18,17 +18,17 @@ import {
 
 // Reference each table to ensure they're properly imported
 const tables = {
-  attributes,
-  attributeValues,
-  users,
-  postTypes,
-  posts,
-  postCollections,
-  postTaxonomies,
-  terms,
-  postCollectionItems,
-  postTerms,
-  postRelations
+	attributes,
+	attributeValues,
+	users,
+	postTypes,
+	posts,
+	postCollections,
+	postTaxonomies,
+	terms,
+	postCollectionItems,
+	postTerms,
+	postRelations
 };
 
 export default tables;

@@ -1,37 +1,45 @@
-import { sequence } from '@sveltejs/kit/hooks';
-import * as auth from '$lib/server/auth';
+import { lucia } from '$lib/server/auth';
 import type { Handle } from '@sveltejs/kit';
-import { paraglideMiddleware } from '$lib/paraglide/server';
 
-const handleParaglide: Handle = ({ event, resolve }) =>
-	paraglideMiddleware(event.request, ({ request, locale }) => {
-		event.request = request;
+// Handle authentication
+export const handle: Handle = async ({ event, resolve }) => {
+	// Get session ID from cookie
+	const sessionId = lucia.readSessionCookie(event.request.headers.get('cookie') || '');
 
-		return resolve(event, {
-			transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', locale)
-		});
-	});
-
-const handleAuth: Handle = async ({ event, resolve }) => {
-	const sessionToken = event.cookies.get(auth.sessionCookieName);
-
-	if (!sessionToken) {
+	if (!sessionId) {
 		event.locals.user = null;
 		event.locals.session = null;
 		return resolve(event);
 	}
 
-	const { session, user } = await auth.validateSessionToken(sessionToken);
+	// Validate session
+	const { session, user } = await lucia.validateSession(sessionId);
 
-	if (session) {
-		auth.setSessionTokenCookie(event, sessionToken, session.expiresAt);
-	} else {
-		auth.deleteSessionTokenCookie(event);
+	if (session && session.fresh) {
+		// Session was refreshed, set new cookie with non-null values
+		const sessionCookie = lucia.createSessionCookie(session.id);
+		event.cookies.set(sessionCookie.name, sessionCookie.value, {
+			path: sessionCookie.attributes.path || '/',
+			secure: sessionCookie.attributes.secure || false,
+			httpOnly: sessionCookie.attributes.httpOnly || true,
+			maxAge: sessionCookie.attributes.maxAge,
+			sameSite: sessionCookie.attributes.sameSite || 'lax'
+		});
+	}
+
+	if (!session) {
+		// Invalid session, clear cookie with non-null values
+		const sessionCookie = lucia.createBlankSessionCookie();
+		event.cookies.set(sessionCookie.name, sessionCookie.value, {
+			path: sessionCookie.attributes.path || '/',
+			secure: sessionCookie.attributes.secure || false,
+			httpOnly: sessionCookie.attributes.httpOnly || true,
+			maxAge: sessionCookie.attributes.maxAge,
+			sameSite: sessionCookie.attributes.sameSite || 'lax'
+		});
 	}
 
 	event.locals.user = user;
 	event.locals.session = session;
 	return resolve(event);
 };
-
-export const handle: Handle = sequence(handleParaglide, handleAuth);

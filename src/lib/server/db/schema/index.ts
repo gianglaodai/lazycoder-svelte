@@ -2,6 +2,7 @@
 export * from './attributes';
 export * from './attributeValues';
 export * from './users';
+export * from './auth'; // Export Lucia auth tables
 export * from './postTypes';
 export * from './posts';
 export * from './postCollections';

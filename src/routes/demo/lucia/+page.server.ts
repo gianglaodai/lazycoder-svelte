@@ -1,4 +1,4 @@
-import * as auth from '$lib/server/auth';
+import { lucia } from '$lib/server/auth';
 import { fail, redirect } from '@sveltejs/kit';
 import { getRequestEvent } from '$app/server';
 import type { Actions, PageServerLoad } from './$types';
@@ -13,8 +13,19 @@ export const actions: Actions = {
 		if (!event.locals.session) {
 			return fail(401);
 		}
-		await auth.invalidateSession(event.locals.session.id);
-		auth.deleteSessionTokenCookie(event);
+
+		// Invalidate the session with Lucia
+		await lucia.invalidateSession(event.locals.session.id);
+
+		// Clear the session cookie
+		const sessionCookie = lucia.createBlankSessionCookie();
+		event.cookies.set(sessionCookie.name, sessionCookie.value, {
+			path: sessionCookie.attributes.path || '/',
+			secure: sessionCookie.attributes.secure,
+			httpOnly: sessionCookie.attributes.httpOnly,
+			maxAge: sessionCookie.attributes.maxAge,
+			sameSite: sessionCookie.attributes.sameSite
+		});
 
 		return redirect(302, '/demo/lucia/login');
 	}

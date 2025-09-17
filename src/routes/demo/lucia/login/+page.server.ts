@@ -2,9 +2,10 @@ import { hash, verify } from '@node-rs/argon2';
 import { encodeBase32LowerCase } from '@oslojs/encoding';
 import { fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
-import * as auth from '$lib/server/auth';
+import { lucia } from '$lib/server/auth';
 import { db } from '$lib/server/db';
-import * as table from '$lib/server/db/schema';
+import { users } from '$lib/server/db/schema/users';
+import { keys } from '$lib/server/db/schema/auth';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -29,26 +30,48 @@ export const actions: Actions = {
 			return fail(400, { message: 'Invalid password (min 6, max 255 characters)' });
 		}
 
-		const results = await db.select().from(table.user).where(eq(table.user.username, username));
+		// Find user by username
+		const existingUser = await db.query.users.findFirst({
+			where: eq(users.username, username)
+		});
 
-		const existingUser = results.at(0);
 		if (!existingUser) {
 			return fail(400, { message: 'Incorrect username or password' });
 		}
 
-		const validPassword = await verify(existingUser.passwordHash, password, {
+		// Find key for this user
+		const key = await db.query.keys.findFirst({
+			where: eq(keys.userId, existingUser.id)
+		});
+
+		if (!key || !key.hashedPassword) {
+			return fail(400, { message: 'Incorrect username or password' });
+		}
+
+		// Verify password
+		const validPassword = await verify(key.hashedPassword, password, {
 			memoryCost: 19456,
 			timeCost: 2,
 			outputLen: 32,
 			parallelism: 1
 		});
+
 		if (!validPassword) {
 			return fail(400, { message: 'Incorrect username or password' });
 		}
 
-		const sessionToken = auth.generateSessionToken();
-		const session = await auth.createSession(sessionToken, existingUser.id);
-		auth.setSessionTokenCookie(event, sessionToken, session.expiresAt);
+		// Create new session with Lucia
+		const session = await lucia.createSession(existingUser.id, {});
+		const sessionCookie = lucia.createSessionCookie(session.id);
+
+		// Set cookie
+		event.cookies.set(sessionCookie.name, sessionCookie.value, {
+			path: sessionCookie.attributes.path || '/',
+			secure: sessionCookie.attributes.secure,
+			httpOnly: sessionCookie.attributes.httpOnly,
+			maxAge: sessionCookie.attributes.maxAge,
+			sameSite: sessionCookie.attributes.sameSite
+		});
 
 		return redirect(302, '/demo/lucia');
 	},
@@ -65,7 +88,7 @@ export const actions: Actions = {
 		}
 
 		const userId = generateUserId();
-		const passwordHash = await hash(password, {
+		const hashedPassword = await hash(password, {
 			// recommended minimum parameters
 			memoryCost: 19456,
 			timeCost: 2,
@@ -74,14 +97,42 @@ export const actions: Actions = {
 		});
 
 		try {
-			await db.insert(table.user).values({ id: userId, username, passwordHash });
+			// Create user with required fields
+			await db.insert(users).values({
+				id: userId,
+				uid: crypto.randomUUID(), // Generate UUID for uid field
+				username,
+				email: `${username}@example.com`, // Default email for demo
+				role: 'USER',
+				version: 0,
+				createdAt: new Date(),
+				updatedAt: new Date()
+			});
 
-			const sessionToken = auth.generateSessionToken();
-			const session = await auth.createSession(sessionToken, userId);
-			auth.setSessionTokenCookie(event, sessionToken, session.expiresAt);
-		} catch {
+			// Create key for password
+			await db.insert(keys).values({
+				id: `username:${username}`,
+				userId,
+				hashedPassword
+			});
+
+			// Create session
+			const session = await lucia.createSession(userId, {});
+			const sessionCookie = lucia.createSessionCookie(session.id);
+
+			// Set cookie
+			event.cookies.set(sessionCookie.name, sessionCookie.value, {
+				path: sessionCookie.attributes.path || '/',
+				secure: sessionCookie.attributes.secure,
+				httpOnly: sessionCookie.attributes.httpOnly,
+				maxAge: sessionCookie.attributes.maxAge,
+				sameSite: sessionCookie.attributes.sameSite
+			});
+		} catch (error) {
+			console.error(error);
 			return fail(500, { message: 'An error has occurred' });
 		}
+
 		return redirect(302, '/demo/lucia');
 	}
 };

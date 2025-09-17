@@ -43,5 +43,5 @@ export const terms = pgTable(
 	}
 );
 
-// Export type
-export type Term = typeof terms.$inferSelect;
+// Export types
+export type TermOrm = typeof terms.$inferSelect;
