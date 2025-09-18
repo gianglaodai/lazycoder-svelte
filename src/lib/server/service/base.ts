@@ -26,10 +26,9 @@ export class BaseService<T extends Entity, C extends CreateFor<T>> {
 		this.repo = repo;
 	}
 
-	// Reads
 	async getById(id: number): Promise<T> {
 		const item = await this.repo.findById(id);
-		if (!item) throw new NotFoundError('Not found');
+		if (!item) throw new NotFoundError();
 		return item;
 	}
 
@@ -39,7 +38,7 @@ export class BaseService<T extends Entity, C extends CreateFor<T>> {
 
 	async getByUid(uid: string): Promise<T> {
 		const item = await this.repo.findByUid(uid);
-		if (!item) throw new NotFoundError('Not found');
+		if (!item) throw new NotFoundError();
 		return item;
 	}
 
@@ -52,10 +51,9 @@ export class BaseService<T extends Entity, C extends CreateFor<T>> {
 	}
 
 	async update(id: number, input: T): Promise<T> {
-		const exists = await this.repo.exist(id);
-		if (!exists) throw new NotFoundError('Not found');
-		(input as T).id = id;
-		return await this.repo.update(input);
+		const entity = await this.repo.findById(id);
+		if (!entity) throw new NotFoundError();
+		return await this.repo.update({ ...entity, ...input });
 	}
 
 	async deleteById(id: number): Promise<number> {

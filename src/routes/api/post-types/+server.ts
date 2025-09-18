@@ -1,12 +1,16 @@
 import type { RequestHandler } from './$types';
 import { json, error } from '@sveltejs/kit';
 import { postTypeService } from '$lib/server/service/postType.service';
-import { randomUUID } from 'crypto';
 import type { PostType } from '$lib/server/service/postType.service';
 
 // TOs
 import type { TransferObject } from '$lib/types/base';
 export interface PostTypeTO extends TransferObject {
+	id: number;
+	uid: string;
+	version: number;
+	createdAt: Date;
+	updatedAt: Date;
 	code: string;
 	name: string;
 }
@@ -21,19 +25,12 @@ function toTO(bo: PostType): PostTypeTO {
 		id: bo.id,
 		uid: bo.uid,
 		version: bo.version,
-		createdAt: bo.createdAt.toISOString(),
-		updatedAt: bo.updatedAt.toISOString(),
+		createdAt: bo.createdAt,
+		updatedAt: bo.updatedAt,
 		code: bo.code,
 		name: bo.name
 	};
 }
-
-export const GET: RequestHandler = async ({ url }) => {
-	const limit = Number(url.searchParams.get('limit') ?? '50');
-	const offset = Number(url.searchParams.get('offset') ?? '0');
-	const data = await postTypeService.list(limit, offset);
-	return json({ items: data.map(toTO), limit, offset });
-};
 
 export const POST: RequestHandler = async ({ request }) => {
 	const body = (await request.json()) as Partial<CreatePostTypeTO>;
@@ -42,7 +39,6 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 	try {
 		const created = await postTypeService.create({
-			uid: randomUUID(),
 			code: body.code,
 			name: body.name
 		});

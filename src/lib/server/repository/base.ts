@@ -1,4 +1,6 @@
 import type { CreateFor, Entity, Repository } from '$lib/server/service/base';
+import { eq, inArray } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 
 export interface ObjectRelationMapper {
 	id: number;
@@ -7,24 +9,143 @@ export interface ObjectRelationMapper {
 	createdAt: Date;
 	updatedAt: Date;
 }
+
 /**
- * Abstract base class that implements the Repository interface shape while
- * allowing concrete repositories to implement the actual persistence.
+ * Generic Drizzle-backed repository with minimal conventions.
+ *
+ * Concrete repositories provide:
+ * - table: the Drizzle table object
+ * - toEntity: mapper from ORM row to domain entity T
+ * - mapCreate: mapper from create input C to insert values
+ * - mapUpdate: mapper from entity T to update values (excluding base columns)
+ * - column references for id, uid, version, updatedAt to build queries
  */
-export abstract class AbstractRepository<T extends Entity, C extends CreateFor<T>>
+export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 	implements Repository<T, C>
 {
-	abstract exist(id: number): Promise<boolean>;
-	abstract findById(id: number): Promise<T | null>;
-	abstract findByIds(ids: number[]): Promise<T[]>;
-	abstract findByUid(uid: string): Promise<T | null>;
-	abstract findByUids(uids: string[]): Promise<T[]>;
+	protected readonly db: any;
+	protected readonly table: any;
+	protected readonly toEntity: (row: any) => T;
+	protected readonly mapCreate: (input: C) => Record<string, any>;
+	protected readonly mapUpdate: (input: T) => Record<string, any>;
 
-	abstract insert(input: C): Promise<T>;
-	abstract update(input: T): Promise<T>;
+	// Column references from the table (e.g., table.id, table.uid, ...)
+	protected readonly idCol: any;
+	protected readonly uidCol: any;
+	protected readonly versionCol: any;
+	protected readonly updatedAtCol: any;
 
-	abstract deleteById(id: number): Promise<number>;
-	abstract deleteByIds(ids: number[]): Promise<number>;
-	abstract deleteByUid(uid: string): Promise<number>;
-	abstract deleteByUids(uids: string[]): Promise<number>;
+	constructor(args: {
+		db: any;
+		table: any;
+		toEntity: (row: any) => T;
+		mapCreate: (input: C) => Record<string, any>;
+		mapUpdate: (input: T) => Record<string, any>;
+		idCol: any;
+		uidCol: any;
+		versionCol: any;
+		updatedAtCol: any;
+	}) {
+		this.db = args.db;
+		this.table = args.table;
+		this.toEntity = args.toEntity;
+		this.mapCreate = args.mapCreate;
+		this.mapUpdate = args.mapUpdate;
+		this.idCol = args.idCol;
+		this.uidCol = args.uidCol;
+		this.versionCol = args.versionCol;
+		this.updatedAtCol = args.updatedAtCol;
+	}
+
+	protected async beforeCreate(input: C): Promise<C> {
+		const now = new Date();
+		return {...input, uid: randomUUID(), version: 0, createdAt: now, updatedAt: now};
+	}
+
+	protected async beforeUpdate(input: T): Promise<T> {
+		return {...input, version: input.version + 1, updatedAt: new Date()};
+	}
+
+	protected async beforeDelete(_ctx: { by: 'id' | 'ids' | 'uid' | 'uids'; value: number | number[] | string | string[] }): Promise<void> {
+		// no-op by default
+	}
+
+	async exist(id: number): Promise<boolean> {
+		const row = await this.db.select({ id: this.idCol }).from(this.table).where(eq(this.idCol, id)).limit(1);
+		return row.length > 0;
+	}
+
+	async findById(id: number): Promise<T | null> {
+		const rows = await this.db.select().from(this.table).where(eq(this.idCol, id)).limit(1);
+		return rows[0] ? this.toEntity(rows[0]) : null;
+	}
+
+	async findByIds(ids: number[]): Promise<T[]> {
+		if (!ids.length) return [];
+		const rows = await this.db.select().from(this.table).where(inArray(this.idCol, ids));
+		return rows.map(this.toEntity);
+	}
+
+	async findByUid(uid: string): Promise<T | null> {
+		const rows = await this.db.select().from(this.table).where(eq(this.uidCol, uid)).limit(1);
+		return rows[0] ? this.toEntity(rows[0]) : null;
+	}
+
+	async findByUids(uids: string[]): Promise<T[]> {
+		if (!uids.length) return [];
+		const rows = await this.db.select().from(this.table).where(inArray(this.uidCol, uids));
+		return rows.map(this.toEntity);
+	}
+
+	async insert(input: C): Promise<T> {
+		const createEntity = await this.beforeCreate(input);
+		const [row] = await this.db.insert(this.table).values(createEntity).returning();
+		return this.toEntity(row);
+	}
+
+	async update(input: T): Promise<T> {
+		const updateEntity = await this.beforeUpdate(input);
+
+		const [row] = await this.db
+			.update(this.table)
+			.set(updateEntity)
+			.where(eq(this.idCol, updateEntity.id))
+			.returning();
+		return this.toEntity(row);
+	}
+
+	async deleteById(id: number): Promise<number> {
+		await this.beforeDelete({ by: 'id', value: id });
+		const rows = await this.db.delete(this.table).where(eq(this.idCol, id)).returning({ id: this.idCol });
+		return rows.length;
+	}
+
+	async deleteByIds(ids: number[]): Promise<number> {
+		if (!ids.length) return 0;
+		await this.beforeDelete({ by: 'ids', value: ids });
+		const rows = await this.db
+			.delete(this.table)
+			.where(inArray(this.idCol, ids))
+			.returning({ id: this.idCol });
+		return rows.length;
+	}
+
+	async deleteByUid(uid: string): Promise<number> {
+		await this.beforeDelete({ by: 'uid', value: uid });
+		const rows = await this.db
+			.delete(this.table)
+			.where(eq(this.uidCol, uid))
+			.returning({ id: this.idCol });
+		return rows.length;
+	}
+
+	async deleteByUids(uids: string[]): Promise<number> {
+		if (!uids.length) return 0;
+		await this.beforeDelete({ by: 'uids', value: uids });
+		const rows = await this.db
+			.delete(this.table)
+			.where(inArray(this.uidCol, uids))
+			.returning({ id: this.idCol });
+		return rows.length;
+	}
 }
