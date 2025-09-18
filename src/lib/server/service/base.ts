@@ -53,7 +53,8 @@ export class BaseService<T extends Entity, C extends CreateFor<T>> {
 	async update(id: number, input: T): Promise<T> {
 		const entity = await this.repo.findById(id);
 		if (!entity) throw new NotFoundError();
-		return await this.repo.update({ ...entity, ...input });
+		const {id: inputId, uid, version, createdAt, updatedAt, ...rest} = input;
+		return await this.repo.update({ ...entity, ...rest });
 	}
 
 	async deleteById(id: number): Promise<number> {
