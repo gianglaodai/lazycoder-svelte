@@ -1,8 +1,9 @@
-import { db } from '$lib/server/db';
 import { postTypes } from '$lib/server/db/schema/postTypes';
 import type { PostTypeOrm } from '$lib/server/db/schema/postTypes';
 import type { PostType, PostTypeCreate } from '$lib/server/service/postType.service';
 import { BaseDrizzleRepository } from '$lib/server/repository/base';
+import { Transactional } from '$lib/server/service/base';
+import { eq } from 'drizzle-orm';
 
 function toEntity(row: PostTypeOrm): PostType {
 	return {
@@ -19,7 +20,6 @@ function toEntity(row: PostTypeOrm): PostType {
 class PostTypeRepository extends BaseDrizzleRepository<PostType, PostTypeCreate> {
 	constructor() {
 		super({
-			db,
 			table: postTypes,
 			toEntity,
 			mapCreate: ({ code, name }) => ({ code, name }),
@@ -31,9 +31,10 @@ class PostTypeRepository extends BaseDrizzleRepository<PostType, PostTypeCreate>
 		});
 	}
 
+	@Transactional
 	async getByCode(code: string): Promise<PostType | null> {
-		const row = await db.query.postTypes.findFirst({ where: (pt, { eq }) => eq(pt.code, code) });
-		return row ? toEntity(row) : null;
+		const rows = await this.getDb().select().from(this.table).where(eq(postTypes.code, code)).limit(1);
+		return rows[0] ? toEntity(rows[0] as PostTypeOrm) : null;
 	}
 }
 

@@ -1,7 +1,7 @@
 import { postTypeRepository } from '../repository/postType.repository';
 
 import type { CreateFor, Entity } from '$lib/server/service/base';
-import { BaseService } from '$lib/server/service/base';
+import { BaseService, Transactional } from '$lib/server/service/base';
 import { BadRequestError, ConflictError } from '$lib/server/service/error';
 
 export interface PostType extends Entity {
@@ -18,16 +18,18 @@ function validateCode(code: string) {
 
 class PostTypeService extends BaseService<PostType, PostTypeCreate> {
 	constructor() {
-		super(postTypeRepository as any);
+		super(postTypeRepository);
 	}
 
+	@Transactional
 	async create(input: PostTypeCreate): Promise<PostType> {
 		validateCode(input.code);
 		const existing = await postTypeRepository.getByCode(input.code);
 		if (existing) throw new ConflictError('error.postType.code.exists');
-		return super.create(input as PostTypeCreate);
+		return super.create(input);
 	}
 
+	@Transactional
 	async update(id: number, input: PostType): Promise<PostType> {
 		if (input.code !== undefined) {
 			validateCode(input.code);
@@ -35,6 +37,11 @@ class PostTypeService extends BaseService<PostType, PostTypeCreate> {
 			if (existing && existing.id !== id) throw new ConflictError('error.postType.code.exists');
 		}
 		return await super.update(id, input);
+	}
+
+	@Transactional
+	async getByCode(code: string): Promise<PostType | null> {
+		return postTypeRepository.getByCode(code);
 	}
 }
 
