@@ -17,7 +17,7 @@ import {
 	notIlike,
 	asc,
 	desc,
-	SQL
+	SQL, getTableColumns
 } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { getCurrentDb } from '$lib/server/db';
@@ -52,7 +52,7 @@ export interface Repository<T extends Entity, C extends CreateFor<T>> {
 	findByIds(ids: number[]): Promise<T[]>;
 	findByUid(uid: string): Promise<T | null>;
 	findByUids(uids: string[]): Promise<T[]>;
-	findMany(filters?: any[], sorts?: any[]): Promise<T[]>;
+	findMany(filters: Filter[], sorts: Sort[]): Promise<T[]>;
 	exist(id: number): Promise<boolean>;
 
 	insert(input: C): Promise<T>;
@@ -77,35 +77,21 @@ export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 	protected readonly mapUpdate: (input: T) => Record<string, any>;
 
 	// Column references from the table (e.g., table.id, table.uid, ...)
-	protected readonly idCol: any;
-	protected readonly uidCol: any;
-	protected readonly versionCol: any;
-	protected readonly updatedAtCol: any;
+	protected readonly columns: Record<string, any>;
 
 	constructor(args: {
 		table: any;
 		toEntity: (row: any) => T;
 		mapCreate: (input: C) => Record<string, any>;
 		mapUpdate: (input: T) => Record<string, any>;
-		idCol: any;
-		uidCol: any;
-		versionCol: any;
-		updatedAtCol: any;
 	}) {
 		this.table = args.table;
 		this.toEntity = args.toEntity;
 		this.mapCreate = args.mapCreate;
 		this.mapUpdate = args.mapUpdate;
-		this.idCol = args.idCol;
-		this.uidCol = args.uidCol;
-		this.versionCol = args.versionCol;
-		this.updatedAtCol = args.updatedAtCol;
+		this.columns = getTableColumns(args.table);
 	}
 
-	/**
-	 * Gets the current database instance, which could be a transaction
-	 * if called within a transaction context, or the default db instance otherwise.
-	 */
 	protected getDb() {
 		return getCurrentDb();
 	}
@@ -140,36 +126,36 @@ export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 	@Transactional
 	async exist(id: number): Promise<boolean> {
 		const row = await this.getDb()
-			.select({ id: this.idCol })
+			.select({ id: this.table.idCol })
 			.from(this.table)
-			.where(eq(this.idCol, id))
+			.where(eq(this.table.idCol, id))
 			.limit(1);
 		return row.length > 0;
 	}
 
 	@Transactional
 	async findById(id: number): Promise<T | null> {
-		const rows = await this.getDb().select().from(this.table).where(eq(this.idCol, id)).limit(1);
+		const rows = await this.getDb().select().from(this.table).where(eq(this.table.idCol, id)).limit(1);
 		return rows[0] ? this.toEntity(rows[0]) : null;
 	}
 
 	@Transactional
 	async findByIds(ids: number[]): Promise<T[]> {
 		if (!ids.length) return [];
-		const rows = await this.getDb().select().from(this.table).where(inArray(this.idCol, ids));
+		const rows = await this.getDb().select().from(this.table).where(inArray(this.table.idCol, ids));
 		return rows.map(this.toEntity);
 	}
 
 	@Transactional
 	async findByUid(uid: string): Promise<T | null> {
-		const rows = await this.getDb().select().from(this.table).where(eq(this.uidCol, uid)).limit(1);
+		const rows = await this.getDb().select().from(this.table).where(eq(this.table.uidCol, uid)).limit(1);
 		return rows[0] ? this.toEntity(rows[0]) : null;
 	}
 
 	@Transactional
 	async findByUids(uids: string[]): Promise<T[]> {
 		if (!uids.length) return [];
-		const rows = await this.getDb().select().from(this.table).where(inArray(this.uidCol, uids));
+		const rows = await this.getDb().select().from(this.table).where(inArray(this.table.uidCol, uids));
 		return rows.map(this.toEntity);
 	}
 
@@ -192,7 +178,7 @@ export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 		const result = await db
 			.update(this.table)
 			.set(updateEntity)
-			.where(and(eq(this.idCol, entity.id), eq(this.versionCol, entity.version)))
+			.where(and(eq(this.table.idCol, entity.id), eq(this.table.versionCol, entity.version)))
 			.returning();
 
 		return this.toEntity(result[0]);
@@ -203,8 +189,8 @@ export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 		await this.beforeDelete({ by: 'id', value: id });
 		const rows = await this.getDb()
 			.delete(this.table)
-			.where(eq(this.idCol, id))
-			.returning({ id: this.idCol });
+			.where(eq(this.table.idCol, id))
+			.returning({ id: this.table.idCol });
 		return rows.length;
 	}
 
@@ -214,8 +200,8 @@ export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 		await this.beforeDelete({ by: 'ids', value: ids });
 		const rows = await this.getDb()
 			.delete(this.table)
-			.where(inArray(this.idCol, ids))
-			.returning({ id: this.idCol });
+			.where(inArray(this.table.idCol, ids))
+			.returning({ id: this.table.idCol });
 		return rows.length;
 	}
 
@@ -224,8 +210,8 @@ export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 		await this.beforeDelete({ by: 'uid', value: uid });
 		const rows = await this.getDb()
 			.delete(this.table)
-			.where(eq(this.uidCol, uid))
-			.returning({ id: this.idCol });
+			.where(eq(this.table.uidCol, uid))
+			.returning({ id: this.table.idCol });
 		return rows.length;
 	}
 
@@ -235,31 +221,15 @@ export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 		await this.beforeDelete({ by: 'uids', value: uids });
 		const rows = await this.getDb()
 			.delete(this.table)
-			.where(inArray(this.uidCol, uids))
-			.returning({ id: this.idCol });
+			.where(inArray(this.table.uidCol, uids))
+			.returning({ id: this.table.idCol });
 		return rows.length;
 	}
 
-	/**
-	 * Creates a column map for use with filters and sorters.
-	 * Override this method in derived repositories to provide a mapping
-	 * from field names to column references.
-	 */
 	protected getColumnMap(): Record<string, any> {
-		return {
-			id: this.idCol,
-			uid: this.uidCol,
-			version: this.versionCol,
-			updatedAt: this.updatedAtCol
-		};
+		return this.columns;
 	}
 
-	/**
-	 * Converts a Filter to a Drizzle ORM condition.
-	 *
-	 * @param filter The filter to convert
-	 * @returns A Drizzle ORM condition
-	 */
 	protected toCondition(filter: Filter): SQL {
 		let column: any;
 

@@ -1,8 +1,9 @@
 import { postTypeRepository } from '../repository/postType.repository';
 
 import type { CreateFor, Entity } from '$lib/server/service/base';
-import { BaseService, Transactional } from '$lib/server/service/base';
+import { BaseService } from '$lib/server/service/base';
 import { BadRequestError, ConflictError } from '$lib/server/service/error';
+import { Transactional } from '$lib/server/service/transaction';
 
 export interface PostType extends Entity {
 	code: string;

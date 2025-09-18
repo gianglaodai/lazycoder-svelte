@@ -2,8 +2,8 @@ import { postTypes } from '$lib/server/db/schema/postTypes';
 import type { PostTypeOrm } from '$lib/server/db/schema/postTypes';
 import type { PostType, PostTypeCreate } from '$lib/server/service/postType.service';
 import { BaseDrizzleRepository } from '$lib/server/repository/base';
-import { Transactional } from '$lib/server/service/base';
 import { eq } from 'drizzle-orm';
+import { Transactional } from '$lib/server/service/transaction';
 
 function toEntity(row: PostTypeOrm): PostType {
 	return {
@@ -24,10 +24,6 @@ class PostTypeRepository extends BaseDrizzleRepository<PostType, PostTypeCreate>
 			toEntity,
 			mapCreate: ({ code, name }) => ({ code, name }),
 			mapUpdate: (entity: PostType) => ({ ...entity }),
-			idCol: postTypes.id,
-			uidCol: postTypes.uid,
-			versionCol: postTypes.version,
-			updatedAtCol: postTypes.updatedAt
 		});
 	}
 
