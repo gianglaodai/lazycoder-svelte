@@ -40,7 +40,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 		createdAt: body.createdAt,
 		updatedAt: body.updatedAt,
 		code: body.code,
-		name: body.name,
+		name: body.name
 	} as PostType);
 	return json(toTO(updated));
 };

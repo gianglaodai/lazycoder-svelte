@@ -37,8 +37,12 @@ This document summarizes the changes made to fix TypeScript errors in the codeba
 The `Transactional` decorator was updated to explicitly return a `PropertyDescriptor`:
 
 ```typescript
-export function Transactional(target: any, propertyKey: string, descriptor: PropertyDescriptor): PropertyDescriptor {
-  // ...
+export function Transactional(
+	target: any,
+	propertyKey: string,
+	descriptor: PropertyDescriptor
+): PropertyDescriptor {
+	// ...
 }
 ```
 
@@ -58,42 +62,42 @@ The transaction implementation was updated to work around TypeScript limitations
 
 ```typescript
 export async function withTransaction<T>(callback: (tx: typeof db) => Promise<T>): Promise<T> {
-  // If already in a transaction, reuse it
-  if (transactionContext.current) {
-    return callback(transactionContext.current);
-  }
+	// If already in a transaction, reuse it
+	if (transactionContext.current) {
+		return callback(transactionContext.current);
+	}
 
-  // Otherwise, create a new transaction
-  // We need to use a different approach due to TypeScript limitations with the Neon client
-  const sql = client as any;
-  
-  // Store the result outside the transaction
-  let result: T;
-  
-  // Execute the transaction
-  await sql.transaction((txClient: any) => {
-    // Create a Drizzle instance with the transaction client
-    const txDb = drizzle(txClient, { schema });
-    
-    // Set the current transaction
-    const previousTx = transactionContext.current;
-    transactionContext.current = txDb;
-    
-    try {
-      // Execute the callback and store the result
-      return callback(txDb).then((r: T) => {
-        result = r;
-        // Return an empty array to satisfy the Neon transaction API
-        return [];
-      });
-    } finally {
-      // Restore the previous transaction context
-      transactionContext.current = previousTx;
-    }
-  });
-  
-  // Return the result
-  return result!;
+	// Otherwise, create a new transaction
+	// We need to use a different approach due to TypeScript limitations with the Neon client
+	const sql = client as any;
+
+	// Store the result outside the transaction
+	let result: T;
+
+	// Execute the transaction
+	await sql.transaction((txClient: any) => {
+		// Create a Drizzle instance with the transaction client
+		const txDb = drizzle(txClient, { schema });
+
+		// Set the current transaction
+		const previousTx = transactionContext.current;
+		transactionContext.current = txDb;
+
+		try {
+			// Execute the callback and store the result
+			return callback(txDb).then((r: T) => {
+				result = r;
+				// Return an empty array to satisfy the Neon transaction API
+				return [];
+			});
+		} finally {
+			// Restore the previous transaction context
+			transactionContext.current = previousTx;
+		}
+	});
+
+	// Return the result
+	return result!;
 }
 ```
 
@@ -119,7 +123,7 @@ async update(entity: T): Promise<T> {
     .set(updateEntity)
     .where(eq(this.idCol, entity.id))
     .returning();
-  
+
   return this.toEntity(result[0]);
 }
 ```
@@ -153,17 +157,17 @@ Type declarations were added for the 'bun:test' module:
 
 ```typescript
 declare module 'bun:test' {
-  export function test(name: string, fn: () => void | Promise<void>): void;
-  export function test(fn: () => void | Promise<void>): void;
-  
-  export const expect: {
-    (value: any): {
-      toBeDefined(): void;
-      // ...
-    };
-  };
-  
-  // ...
+	export function test(name: string, fn: () => void | Promise<void>): void;
+	export function test(fn: () => void | Promise<void>): void;
+
+	export const expect: {
+		(value: any): {
+			toBeDefined(): void;
+			// ...
+		};
+	};
+
+	// ...
 }
 ```
 

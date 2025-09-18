@@ -21,51 +21,51 @@ The database layer provides the foundation for the transaction-first implementat
 ```typescript
 // Transaction context for tracking active transactions
 const transactionContext = {
-  current: null as any
+	current: null as any
 };
 
 // Get the current database instance (transaction or default)
 export function getCurrentDb(): typeof db {
-  return transactionContext.current || db;
+	return transactionContext.current || db;
 }
 
 // Execute a callback within a transaction
 export async function withTransaction<T>(callback: (tx: typeof db) => Promise<T>): Promise<T> {
-  // If already in a transaction, reuse it
-  if (transactionContext.current) {
-    return callback(transactionContext.current);
-  }
+	// If already in a transaction, reuse it
+	if (transactionContext.current) {
+		return callback(transactionContext.current);
+	}
 
-  // Otherwise, create a new transaction
-  return client.transaction(async (txClient) => {
-    const txDb = drizzle(txClient, { schema });
-    
-    // Set the current transaction
-    const previousTx = transactionContext.current;
-    transactionContext.current = txDb;
-    
-    try {
-      // Execute the callback
-      const result = await callback(txDb);
-      return result;
-    } finally {
-      // Restore the previous transaction context
-      transactionContext.current = previousTx;
-    }
-  });
+	// Otherwise, create a new transaction
+	return client.transaction(async (txClient) => {
+		const txDb = drizzle(txClient, { schema });
+
+		// Set the current transaction
+		const previousTx = transactionContext.current;
+		transactionContext.current = txDb;
+
+		try {
+			// Execute the callback
+			const result = await callback(txDb);
+			return result;
+		} finally {
+			// Restore the previous transaction context
+			transactionContext.current = previousTx;
+		}
+	});
 }
 
 // Decorator for adding transaction support to methods
 export function Transactional(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-  const originalMethod = descriptor.value;
-  
-  descriptor.value = async function(...args: any[]) {
-    return withTransaction(async () => {
-      return originalMethod.apply(this, args);
-    });
-  };
-  
-  return descriptor;
+	const originalMethod = descriptor.value;
+
+	descriptor.value = async function (...args: any[]) {
+		return withTransaction(async () => {
+			return originalMethod.apply(this, args);
+		});
+	};
+
+	return descriptor;
 }
 ```
 
@@ -75,23 +75,23 @@ The repository layer uses the `getCurrentDb()` function and `@Transactional` dec
 
 ```typescript
 export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
-  implements Repository<T, C>
+	implements Repository<T, C>
 {
-  // ...
+	// ...
 
-  // Get the current database instance (transaction or default)
-  protected getDb() {
-    return getCurrentDb();
-  }
+	// Get the current database instance (transaction or default)
+	protected getDb() {
+		return getCurrentDb();
+	}
 
-  // All methods are decorated with @Transactional
-  @Transactional
-  async findById(id: number): Promise<T | null> {
-    const rows = await this.getDb().select().from(this.table).where(eq(this.idCol, id)).limit(1);
-    return rows[0] ? this.toEntity(rows[0]) : null;
-  }
+	// All methods are decorated with @Transactional
+	@Transactional
+	async findById(id: number): Promise<T | null> {
+		const rows = await this.getDb().select().from(this.table).where(eq(this.idCol, id)).limit(1);
+		return rows[0] ? this.toEntity(rows[0]) : null;
+	}
 
-  // Other methods...
+	// Other methods...
 }
 ```
 
@@ -101,17 +101,17 @@ The service layer also uses the `@Transactional` decorator:
 
 ```typescript
 export class BaseService<T extends Entity, C extends CreateFor<T>> {
-  // ...
+	// ...
 
-  // All methods are decorated with @Transactional
-  @Transactional
-  async getById(id: number): Promise<T> {
-    const item = await this.repo.findById(id);
-    if (!item) throw new NotFoundError();
-    return item;
-  }
+	// All methods are decorated with @Transactional
+	@Transactional
+	async getById(id: number): Promise<T> {
+		const item = await this.repo.findById(id);
+		if (!item) throw new NotFoundError();
+		return item;
+	}
 
-  // Other methods...
+	// Other methods...
 }
 ```
 
@@ -127,8 +127,8 @@ const postType = await postTypeService.getById(1);
 
 // This also automatically runs in a transaction
 const updatedPostType = await postTypeService.update(1, {
-  ...postType,
-  name: 'New Name'
+	...postType,
+	name: 'New Name'
 });
 ```
 
@@ -143,17 +143,17 @@ import { Transactional } from '$lib/server/db';
 @Transactional
 async function complexOperation() {
   const postType = await postTypeService.getById(1);
-  
+
   const updatedPostType = await postTypeService.update(1, {
     ...postType,
     name: 'New Name'
   });
-  
+
   const newPostType = await postTypeService.create({
     code: 'new-code',
     name: 'New Post Type'
   });
-  
+
   return { updatedPostType, newPostType };
 }
 ```
@@ -166,13 +166,17 @@ When creating custom repository methods, use the `getDb()` method and decorate t
 import { Transactional } from '$lib/server/db';
 
 class CustomRepository extends BaseDrizzleRepository<CustomEntity, CustomCreate> {
-  // ...
+	// ...
 
-  @Transactional
-  async customMethod(param: string): Promise<CustomEntity | null> {
-    const rows = await this.getDb().select().from(this.table).where(eq(this.customCol, param)).limit(1);
-    return rows[0] ? this.toEntity(rows[0]) : null;
-  }
+	@Transactional
+	async customMethod(param: string): Promise<CustomEntity | null> {
+		const rows = await this.getDb()
+			.select()
+			.from(this.table)
+			.where(eq(this.customCol, param))
+			.limit(1);
+		return rows[0] ? this.toEntity(rows[0]) : null;
+	}
 }
 ```
 
@@ -184,15 +188,15 @@ When creating custom service methods, decorate the method with `@Transactional`:
 import { Transactional } from '$lib/server/db';
 
 class CustomService extends BaseService<CustomEntity, CustomCreate> {
-  // ...
+	// ...
 
-  @Transactional
-  async customMethod(param: string): Promise<CustomEntity> {
-    // This runs in a transaction
-    const entity = await this.repo.customMethod(param);
-    if (!entity) throw new NotFoundError();
-    return entity;
-  }
+	@Transactional
+	async customMethod(param: string): Promise<CustomEntity> {
+		// This runs in a transaction
+		const entity = await this.repo.customMethod(param);
+		if (!entity) throw new NotFoundError();
+		return entity;
+	}
 }
 ```
 
@@ -222,37 +226,37 @@ To debug transaction issues, you can add logging to the `withTransaction` functi
 
 ```typescript
 export async function withTransaction<T>(callback: (tx: typeof db) => Promise<T>): Promise<T> {
-  console.log('Starting transaction');
-  
-  // If already in a transaction, reuse it
-  if (transactionContext.current) {
-    console.log('Reusing existing transaction');
-    return callback(transactionContext.current);
-  }
+	console.log('Starting transaction');
 
-  // Otherwise, create a new transaction
-  console.log('Creating new transaction');
-  return client.transaction(async (txClient) => {
-    const txDb = drizzle(txClient, { schema });
-    
-    // Set the current transaction
-    const previousTx = transactionContext.current;
-    transactionContext.current = txDb;
-    
-    try {
-      // Execute the callback
-      console.log('Executing transaction callback');
-      const result = await callback(txDb);
-      console.log('Transaction successful');
-      return result;
-    } catch (error) {
-      console.error('Transaction failed:', error);
-      throw error;
-    } finally {
-      // Restore the previous transaction context
-      console.log('Restoring previous transaction context');
-      transactionContext.current = previousTx;
-    }
-  });
+	// If already in a transaction, reuse it
+	if (transactionContext.current) {
+		console.log('Reusing existing transaction');
+		return callback(transactionContext.current);
+	}
+
+	// Otherwise, create a new transaction
+	console.log('Creating new transaction');
+	return client.transaction(async (txClient) => {
+		const txDb = drizzle(txClient, { schema });
+
+		// Set the current transaction
+		const previousTx = transactionContext.current;
+		transactionContext.current = txDb;
+
+		try {
+			// Execute the callback
+			console.log('Executing transaction callback');
+			const result = await callback(txDb);
+			console.log('Transaction successful');
+			return result;
+		} catch (error) {
+			console.error('Transaction failed:', error);
+			throw error;
+		} finally {
+			// Restore the previous transaction context
+			console.log('Restoring previous transaction context');
+			transactionContext.current = previousTx;
+		}
+	});
 }
 ```

@@ -31,9 +31,21 @@ class PostTypeRepository extends BaseDrizzleRepository<PostType, PostTypeCreate>
 		});
 	}
 
+	protected override getColumnMap(): Record<string, any> {
+		return {
+			...super.getColumnMap(),
+			code: postTypes.code,
+			name: postTypes.name
+		};
+	}
+
 	@Transactional
 	async getByCode(code: string): Promise<PostType | null> {
-		const rows = await this.getDb().select().from(this.table).where(eq(postTypes.code, code)).limit(1);
+		const rows = await this.getDb()
+			.select()
+			.from(this.table)
+			.where(eq(postTypes.code, code))
+			.limit(1);
 		return rows[0] ? toEntity(rows[0] as PostTypeOrm) : null;
 	}
 }

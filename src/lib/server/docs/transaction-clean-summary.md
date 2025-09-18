@@ -44,7 +44,7 @@ async withTransaction<R>(
     ...this,
     db: txDb
   });
-  
+
   return operation(txRepo);
 }
 
@@ -88,22 +88,20 @@ async withTransaction<R>(
 
 ```typescript
 // Update an entity within a transaction
-await userService.withTransaction(txService => 
-  txService.update(userId, userData)
-);
+await userService.withTransaction((txService) => txService.update(userId, userData));
 ```
 
 ### Complex Operations:
 
 ```typescript
 // Update a user and their profile in a single transaction
-await userService.withTransaction(async txUserService => {
-  const updatedUser = await txUserService.update(userId, userData);
-  
-  const txProfileService = await profileService.withTransaction(s => Promise.resolve(s));
-  const updatedProfile = await txProfileService.update(profileId, profileData);
-  
-  return { user: updatedUser, profile: updatedProfile };
+await userService.withTransaction(async (txUserService) => {
+	const updatedUser = await txUserService.update(userId, userData);
+
+	const txProfileService = await profileService.withTransaction((s) => Promise.resolve(s));
+	const updatedProfile = await txProfileService.update(profileId, profileData);
+
+	return { user: updatedUser, profile: updatedProfile };
 });
 ```
 

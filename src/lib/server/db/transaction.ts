@@ -7,11 +7,11 @@ import { withTransaction as dbWithTransaction } from './index';
  * to the concrete implementation in the database layer.
  */
 export class DrizzleTransactionManager implements TransactionManager {
-  async withTransaction<T>(callback: (context: unknown) => Promise<T>): Promise<T> {
-    return dbWithTransaction(async (tx) => {
-      return callback(tx);
-    });
-  }
+	async withTransaction<T>(callback: (context: unknown) => Promise<T>): Promise<T> {
+		return dbWithTransaction(async (tx) => {
+			return callback(tx);
+		});
+	}
 }
 
 // Create a singleton instance

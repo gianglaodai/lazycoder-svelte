@@ -14,10 +14,10 @@ The transaction support is implemented in `src/lib/server/db/index.ts`:
 
 ```typescript
 export async function withTransaction<T>(callback: (tx: typeof db) => Promise<T>): Promise<T> {
-  return client.transaction(async (txClient) => {
-    const txDb = drizzle(txClient, { schema });
-    return callback(txDb);
-  });
+	return client.transaction(async (txClient) => {
+		const txDb = drizzle(txClient, { schema });
+		return callback(txDb);
+	});
 }
 ```
 
@@ -61,9 +61,7 @@ This method creates a transactional service instance and executes the provided o
 
 ```typescript
 // Example: Update an entity within a transaction
-await userService.withTransaction(txService => 
-  txService.update(userId, userData)
-);
+await userService.withTransaction((txService) => txService.update(userId, userData));
 ```
 
 ### Complex Operations
@@ -72,17 +70,17 @@ For operations that involve multiple entities:
 
 ```typescript
 // Example: Update a user and their profile in a single transaction
-await userService.withTransaction(async txUserService => {
-  // Update the user
-  const updatedUser = await txUserService.update(userId, userData);
-  
-  // Get a transactional profile service
-  const txProfileService = await profileService.withTransaction(s => Promise.resolve(s));
-  
-  // Update the profile
-  const updatedProfile = await txProfileService.update(profileId, profileData);
-  
-  return { user: updatedUser, profile: updatedProfile };
+await userService.withTransaction(async (txUserService) => {
+	// Update the user
+	const updatedUser = await txUserService.update(userId, userData);
+
+	// Get a transactional profile service
+	const txProfileService = await profileService.withTransaction((s) => Promise.resolve(s));
+
+	// Update the profile
+	const updatedProfile = await txProfileService.update(profileId, profileData);
+
+	return { user: updatedUser, profile: updatedProfile };
 });
 ```
 
@@ -131,17 +129,17 @@ To debug transaction issues, you can add logging to the `withTransaction` functi
 
 ```typescript
 export async function withTransaction<T>(callback: (tx: typeof db) => Promise<T>): Promise<T> {
-  console.log('Starting transaction');
-  try {
-    const result = await client.transaction(async (txClient) => {
-      const txDb = drizzle(txClient, { schema });
-      return callback(txDb);
-    });
-    console.log('Transaction committed successfully');
-    return result;
-  } catch (error) {
-    console.error('Transaction rolled back:', error);
-    throw error;
-  }
+	console.log('Starting transaction');
+	try {
+		const result = await client.transaction(async (txClient) => {
+			const txDb = drizzle(txClient, { schema });
+			return callback(txDb);
+		});
+		console.log('Transaction committed successfully');
+		return result;
+	} catch (error) {
+		console.error('Transaction rolled back:', error);
+		throw error;
+	}
 }
 ```

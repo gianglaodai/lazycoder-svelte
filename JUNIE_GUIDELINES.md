@@ -21,34 +21,34 @@ Project structure (high level)
 Package manager and runner
 
 - Always use Bun for local commands and scripts. Do NOT use npm or npx in this repository.
-  - Run package scripts: bun run <script>
-  - Execute CLIs without installing locally: bunx <cli> [args]
-  - Example (create Svelte project): bunx sv create my-app
+  - Run package scripts: `bun run <script>`
+  - Execute CLIs without installing locally: `bunx <cli> [args]`
+  - Example (create Svelte project): `bunx sv create my-app`
   - If you see npm/npx in docs or examples, replace with bun/bunx equivalents.
 
 Common scripts (preferred usage)
 
 - Development server
-  - bun run dev
+  - `bun run dev`
 - Build production bundle
-  - bun run build
+  - `bun run build`
 - Preview production build
-  - bun run preview
+  - `bun run preview`
 - Typecheck (Svelte + TS)
-  - bun run check
-  - Watch mode: bun run check:watch
+  - `bun run check`
+  - Watch mode: `bun run check:watch`
 - Linting and formatting
-  - Lint (Prettier check + ESLint): bun run lint
-  - Format (Prettier write): bun run format
+  - Lint (Prettier check + ESLint): `bun run lint`
+  - Format (Prettier write): `bun run format`
 - Unit tests (Bun test)
-  - bun run test
+  - `bun run test`
 - End-to-end tests (Playwright)
-  - bun run test:e2e
+  - `bun run test:e2e`
 - Database (Drizzle Kit)
-  - Push schema to database: bun run db:push
-  - Generate migration files: bun run db:generate
-  - Apply migrations: bun run db:migrate
-  - Studio UI: bun run db:studio
+  - Push schema to database: `bun run db:push`
+  - Generate migration files: `bun run db:generate`
+  - Apply migrations: `bun run db:migrate`
+  - Studio UI: `bun run db:studio`
 
 Clean architecture and naming conventions
 

@@ -1,6 +1,8 @@
 import { ConflictError, NotFoundError } from '$lib/server/service/error';
 import type { CreateFor, Repository } from '$lib/server/repository/base';
 import { Transactional } from '$lib/server/service/transaction';
+import type { Filter } from '$lib/server/service/filter';
+import type { Sort } from '$lib/server/service/sort';
 export type { CreateFor };
 
 export interface Entity {
@@ -55,7 +57,7 @@ export class BaseService<T extends Entity, C extends CreateFor<T>> {
 		if (!entity) throw new NotFoundError();
 		if (entity.version !== input.version) throw new ConflictError();
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		const {id: inputId, uid, version, createdAt, updatedAt, ...rest} = input;
+		const { id: inputId, uid, version, createdAt, updatedAt, ...rest } = input;
 		return await this.repo.update({ ...entity, ...rest });
 	}
 
@@ -80,20 +82,35 @@ export class BaseService<T extends Entity, C extends CreateFor<T>> {
 	}
 
 	@Transactional
-	async updateMultiple(updates: Array<{id: number, data: T}>): Promise<T[]> {
+	async updateMultiple(updates: Array<{ id: number; data: T }>): Promise<T[]> {
 		const results: T[] = [];
-		
+
 		for (const update of updates) {
 			results.push(await this.update(update.id, update.data));
 		}
-		
+
 		return results;
 	}
 
 	@Transactional
-	async createWithRelatedOperations(input: C, relatedOperation: (entity: T) => Promise<void>): Promise<T> {
+	async createWithRelatedOperations(
+		input: C,
+		relatedOperation: (entity: T) => Promise<void>
+	): Promise<T> {
 		const entity = await this.create(input);
 		await relatedOperation(entity);
 		return entity;
+	}
+
+	/**
+	 * Gets entities based on the provided filters and sorts.
+	 *
+	 * @param filters Optional list of filters to apply
+	 * @param sorts Optional list of sorts to apply
+	 * @returns List of entities matching the filters, ordered by the sorts
+	 */
+	@Transactional
+	async getMany(filters: Filter[] = [], sorts: Sort[] = []): Promise<T[]> {
+		return this.repo.findMany(filters, sorts);
 	}
 }
