@@ -1,6 +1,6 @@
 import type { CreateFor, Entity, Repository } from '$lib/server/service/base';
 import { eq, inArray } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto';
+import { uuidv7 } from 'uuidv7';
 
 export interface ObjectRelationMapper {
 	id: number;
@@ -10,16 +10,6 @@ export interface ObjectRelationMapper {
 	updatedAt: Date;
 }
 
-/**
- * Generic Drizzle-backed repository with minimal conventions.
- *
- * Concrete repositories provide:
- * - table: the Drizzle table object
- * - toEntity: mapper from ORM row to domain entity T
- * - mapCreate: mapper from create input C to insert values
- * - mapUpdate: mapper from entity T to update values (excluding base columns)
- * - column references for id, uid, version, updatedAt to build queries
- */
 export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 	implements Repository<T, C>
 {
@@ -59,7 +49,7 @@ export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 
 	protected async beforeCreate(input: C): Promise<C> {
 		const now = new Date();
-		return {...input, uid: randomUUID(), version: 0, createdAt: now, updatedAt: now};
+		return { ...input, uid: uuidv7(), version: 0, createdAt: now, updatedAt: now };
 	}
 
 	protected async beforeUpdate(input: T): Promise<T> {
