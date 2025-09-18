@@ -1,5 +1,7 @@
 import { pgTable, serial, integer, text, timestamp, uuid, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import type { AssertExtends } from '$lib/types/base';
+import type { ObjectRelationMapper } from '$lib/server/repository/base';
 
 // Post types table
 export const postTypes = pgTable(
@@ -22,3 +24,5 @@ export const postTypes = pgTable(
 
 // Export types
 export type PostTypeOrm = typeof postTypes.$inferSelect;
+// Compile-time assertion: ensure ORM row has the standard base fields
+export type _AssertPostTypeOrmBase = AssertExtends<PostTypeOrm, ObjectRelationMapper>;

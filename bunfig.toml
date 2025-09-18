@@ -1,0 +1,7 @@
+# Bun configuration
+# Limit bun test to only run unit tests under src/ and ignore e2e Playwright tests.
+[test]
+match = [
+  "src/**/*.test.*",
+  "src/**/*.spec.*"
+]

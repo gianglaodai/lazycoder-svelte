@@ -1,19 +1,5 @@
 // Test file to verify Orm type exports
-import {
-	PostOrm,
-	UserOrm,
-	SessionOrm,
-	KeyOrm,
-	PostTypeOrm,
-	PostCollectionOrm,
-	PostTaxonomyOrm,
-	TermOrm,
-	PostCollectionItemOrm,
-	PostTermOrm,
-	PostRelationOrm,
-	AttributeOrm,
-	AttributeValueOrm
-} from './schema';
+import type { PostOrm, UserOrm, SessionOrm, PostTypeOrm, TermOrm, AttributeOrm } from './schema';
 
 // Function that demonstrates using the Orm types
 function processOrmData() {
