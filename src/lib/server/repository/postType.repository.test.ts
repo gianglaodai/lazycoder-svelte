@@ -3,7 +3,6 @@ import { postTypeRepository } from './postType.repository';
 import { testDb, withTestTransaction, closeTestDb } from '../db/test-db';
 import { postTypes } from '../db/schema/postTypes';
 import type { PostType, PostTypeCreate } from '../service/postType.service';
-import { eq, like } from '../service/filter';
 import { ascSort, descSort } from '../service/sort';
 
 // Test fixtures
@@ -254,7 +253,6 @@ test('exist should return false for non-existing post type', async () => {
 	}
 });
 
-test('findMany should filter post types by exact match', async () => {
 	const cleanup = setupTestDb();
 
 	try {

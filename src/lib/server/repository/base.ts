@@ -1,31 +1,11 @@
 import type { Entity } from '$lib/server/service/base';
-import {
-	and,
-	eq,
-	inArray,
-	gt,
-	gte,
-	lt,
-	lte,
-	isNull,
-	isNotNull,
-	ne,
-	notInArray,
-	between,
-	notBetween,
-	ilike,
-	notIlike,
-	asc,
-	desc,
-	SQL, getTableColumns
-} from 'drizzle-orm';
+import { and, eq, inArray, asc, desc, SQL, getTableColumns } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { getCurrentDb } from '$lib/server/db';
 import { Transactional } from '$lib/server/service/transaction';
-import type { Filter } from '$lib/server/service/filter';
-import { FilterOperator, isFieldFilter, isAttrFilter } from '$lib/server/service/filter';
 import type { Sort } from '$lib/server/service/sort';
 import { SortDirection } from '$lib/server/service/sort';
+import { attributes } from '$lib/server/db/schema/attributes';
 
 export interface ObjectRelationMapper {
 	id: number;
@@ -47,12 +27,14 @@ export interface CreateFor<T extends Entity> {
  * Repository contract for data access layer used by services.
  * Defines the minimal operations expected from any repository.
  */
+export type ScalarType = 'Bool' | 'Int' | 'Float' | 'Date' | 'Datetime' | 'String';
+
 export interface Repository<T extends Entity, C extends CreateFor<T>> {
 	findById(id: number): Promise<T | null>;
 	findByIds(ids: number[]): Promise<T[]>;
 	findByUid(uid: string): Promise<T | null>;
 	findByUids(uids: string[]): Promise<T[]>;
-	findMany(filters: Filter[], sorts: Sort[]): Promise<T[]>;
+	findMany(sorts: Sort[]): Promise<T[]>;
 	exist(id: number): Promise<boolean>;
 
 	insert(input: C): Promise<T>;
@@ -62,6 +44,11 @@ export interface Repository<T extends Entity, C extends CreateFor<T>> {
 	deleteByIds(ids: number[]): Promise<number>;
 	deleteByUid(uid: string): Promise<number>;
 	deleteByUids(uids: string[]): Promise<number>;
+
+	// New metadata methods inspired by lazycoder-leptos service.rs
+	getTableName(): string;
+	getColumnTypeMap(): Promise<Record<string, ScalarType>>;
+	getAttributeTypeMap?(): Promise<Record<string, ScalarType>>;
 }
 
 /**
@@ -78,18 +65,21 @@ export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 
 	// Column references from the table (e.g., table.id, table.uid, ...)
 	protected readonly columns: Record<string, any>;
+	protected readonly tableName: string;
 
 	constructor(args: {
 		table: any;
 		toEntity: (row: any) => T;
 		mapCreate: (input: C) => Record<string, any>;
 		mapUpdate: (input: T) => Record<string, any>;
+		tableName?: string;
 	}) {
 		this.table = args.table;
 		this.toEntity = args.toEntity;
 		this.mapCreate = args.mapCreate;
 		this.mapUpdate = args.mapUpdate;
 		this.columns = getTableColumns(args.table);
+		this.tableName = args.tableName ?? (args.table?.["_" + "name"] ?? args.table?.name ?? 'unknown');
 	}
 
 	protected getDb() {
@@ -135,7 +125,11 @@ export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 
 	@Transactional
 	async findById(id: number): Promise<T | null> {
-		const rows = await this.getDb().select().from(this.table).where(eq(this.table.idCol, id)).limit(1);
+		const rows = await this.getDb()
+			.select()
+			.from(this.table)
+			.where(eq(this.table.idCol, id))
+			.limit(1);
 		return rows[0] ? this.toEntity(rows[0]) : null;
 	}
 
@@ -148,14 +142,21 @@ export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 
 	@Transactional
 	async findByUid(uid: string): Promise<T | null> {
-		const rows = await this.getDb().select().from(this.table).where(eq(this.table.uidCol, uid)).limit(1);
+		const rows = await this.getDb()
+			.select()
+			.from(this.table)
+			.where(eq(this.table.uidCol, uid))
+			.limit(1);
 		return rows[0] ? this.toEntity(rows[0]) : null;
 	}
 
 	@Transactional
 	async findByUids(uids: string[]): Promise<T[]> {
 		if (!uids.length) return [];
-		const rows = await this.getDb().select().from(this.table).where(inArray(this.table.uidCol, uids));
+		const rows = await this.getDb()
+			.select()
+			.from(this.table)
+			.where(inArray(this.table.uidCol, uids));
 		return rows.map(this.toEntity);
 	}
 
@@ -230,62 +231,6 @@ export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 		return this.columns;
 	}
 
-	protected toCondition(filter: Filter): SQL {
-		let column: any;
-
-		if (isFieldFilter(filter)) {
-			column = this.getColumnMap()[filter.field_name];
-			if (!column) {
-				throw new Error(`Unknown field: ${filter.field_name}`);
-			}
-		} else if (isAttrFilter(filter)) {
-			throw new Error('EAV model not fully implemented in BaseDrizzleRepository');
-		} else {
-			throw new Error('Invalid filter type');
-		}
-
-		switch (filter.operator) {
-			case FilterOperator.EQUAL:
-				return eq(column, filter.value);
-			case FilterOperator.NOT_EQUAL:
-				return ne(column, filter.value);
-			case FilterOperator.GREATER_THAN:
-				return gt(column, filter.value);
-			case FilterOperator.GREATER_THAN_OR_EQUAL:
-				return gte(column, filter.value);
-			case FilterOperator.LESS_THAN:
-				return lt(column, filter.value);
-			case FilterOperator.LESS_THAN_OR_EQUAL:
-				return lte(column, filter.value);
-			case FilterOperator.LIKE:
-				return ilike(column, `%${filter.value}%`);
-			case FilterOperator.NOT_LIKE:
-				return notIlike(column, `%${filter.value}%`);
-			case FilterOperator.IS:
-				return eq(column, filter.value);
-			case FilterOperator.IN:
-				return inArray(column, filter.value);
-			case FilterOperator.NOT_IN:
-				return notInArray(column, filter.value);
-			case FilterOperator.IS_NULL:
-				return isNull(column);
-			case FilterOperator.NOT_NULL:
-				return isNotNull(column);
-			case FilterOperator.BETWEEN:
-				if (!Array.isArray(filter.value) || filter.value.length !== 2) {
-					throw new Error('BETWEEN operator requires an array of two values');
-				}
-				return between(column, filter.value[0], filter.value[1]);
-			case FilterOperator.NOT_BETWEEN:
-				if (!Array.isArray(filter.value) || filter.value.length !== 2) {
-					throw new Error('NOT_BETWEEN operator requires an array of two values');
-				}
-				return notBetween(column, filter.value[0], filter.value[1]);
-			default:
-				throw new Error(`Unsupported filter operator: ${filter.operator}`);
-		}
-	}
-
 	/**
 	 * Converts a Sort to a Drizzle ORM order.
 	 *
@@ -318,14 +263,8 @@ export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 	}
 
 	@Transactional
-	async findMany(filters: Filter[] = [], sorts: Sort[] = []): Promise<T[]> {
+	async findMany(sorts: Sort[] = []): Promise<T[]> {
 		let query: any = this.getDb().select().from(this.table);
-
-		// Apply filters if any
-		if (filters.length > 0) {
-			const conditions = filters.map((filter) => this.toCondition(filter));
-			query = query.where(and(...conditions));
-		}
 
 		// Apply sorting if any
 		if (sorts.length > 0) {
@@ -335,5 +274,66 @@ export class BaseDrizzleRepository<T extends Entity, C extends CreateFor<T>>
 
 		const rows = await query;
 		return rows.map(this.toEntity);
+	}
+
+	getTableName(): string {
+		return this.tableName;
+	}
+
+	async getColumnTypeMap(): Promise<Record<string, ScalarType>> {
+		const result: Record<string, ScalarType> = {};
+		const cols = this.getColumnMap();
+		for (const [key, col] of Object.entries(cols)) {
+			result[key] = this.#inferScalarType(col, key);
+		}
+		return result;
+	}
+
+	// EAV attribute map: read from attributes table for this entity type
+	async getAttributeTypeMap(): Promise<Record<string, ScalarType>> {
+		// We look up attributes where entity_type = this repository's table name
+		const db = this.getDb();
+		// Lazy import to avoid circular deps at module init
+		const rows = await db
+			.select({ name: (attributes as any).name, dataType: (attributes as any).dataType })
+			.from(attributes as any)
+			.where(eq((attributes as any).entityType, this.tableName));
+		const out: Record<string, ScalarType> = {};
+		for (const r of rows as Array<{ name: string; dataType: string }>) {
+			out[r.name] = this.#mapAttributeType(r.dataType);
+		}
+		return out;
+	}
+
+	#inferScalarType(col: any, key: string): ScalarType {
+		const dt = (col?.dataType ?? col?._?.dataType ?? col?._?.type ?? col?.sqlName ?? '').toString();
+		const lower = dt.toLowerCase();
+		if (lower.includes('bool')) return 'Bool';
+		if (lower.includes('int') || lower.includes('serial')) return 'Int';
+		if (lower.includes('real') || lower.includes('double') || lower.includes('float') || lower.includes('numeric') || lower.includes('decimal')) return 'Float';
+		if (lower.includes('timestamp') || lower.includes('timestamptz')) return 'Datetime';
+		if (lower.includes('date') && !lower.includes('timestamp')) return 'Date';
+		// Heuristics
+		if (key === 'id' || key === 'version') return 'Int';
+		if (key === 'createdAt' || key === 'updatedAt') return 'Datetime';
+		if (key === 'uid') return 'String';
+		return 'String';
+	}
+
+	#mapAttributeType(typeStr: string): ScalarType {
+		const lower = (typeStr ?? '').toString().toLowerCase();
+		if (lower.includes('bool')) return 'Bool';
+		if (lower === 'int' || lower === 'integer' || lower.includes('int')) return 'Int';
+		if (
+			lower === 'float' ||
+			lower === 'double' ||
+			lower === 'real' ||
+			lower.includes('numeric') ||
+			lower.includes('decimal')
+		)
+			return 'Float';
+		if (lower === 'datetime' || lower.includes('timestamp') || lower.includes('timestamptz')) return 'Datetime';
+		if (lower === 'date') return 'Date';
+		return 'String';
 	}
 }

@@ -1,9 +1,9 @@
 import { ConflictError, NotFoundError } from '$lib/server/service/error';
-import type { CreateFor, Repository } from '$lib/server/repository/base';
+import type { CreateFor, Repository, ScalarType } from '$lib/server/repository/base';
 import { Transactional } from '$lib/server/service/transaction';
-import type { Filter } from '$lib/server/service/filter';
 import type { Sort } from '$lib/server/service/sort';
 export type { CreateFor };
+import { ATTRIBUTE_TYPE_MAP, FIELD_TYPE_MAP, getOrCompute } from '$lib/server/service/cache';
 
 export interface Entity {
 	id: number;
@@ -20,6 +20,20 @@ export class BaseService<T extends Entity, C extends CreateFor<T>> {
 
 	constructor(repo: Repository<T, C>) {
 		this.repo = repo;
+	}
+
+	// Inspired by lazycoder-leptos ViewService.get_property_type_map
+	async getPropertyTypeMap(): Promise<Record<string, ScalarType>> {
+		const table = this.repo.getTableName();
+		return getOrCompute(FIELD_TYPE_MAP, table, () => this.repo.getColumnTypeMap());
+	}
+
+	// Inspired by lazycoder-leptos Service.get_attribute_type_map (EAV)
+	async getAttributeTypeMap(): Promise<Record<string, ScalarType>> {
+		const table = this.repo.getTableName();
+		const loader = async () =>
+			this.repo.getAttributeTypeMap ? this.repo.getAttributeTypeMap() : Promise.resolve({});
+		return getOrCompute(ATTRIBUTE_TYPE_MAP, table, loader);
 	}
 
 	@Transactional
@@ -103,14 +117,13 @@ export class BaseService<T extends Entity, C extends CreateFor<T>> {
 	}
 
 	/**
-	 * Gets entities based on the provided filters and sorts.
+	 * Gets entities ordered by the provided sorts.
 	 *
-	 * @param filters Optional list of filters to apply
 	 * @param sorts Optional list of sorts to apply
-	 * @returns List of entities matching the filters, ordered by the sorts
+	 * @returns List of entities ordered by the sorts
 	 */
 	@Transactional
-	async getMany(filters: Filter[] = [], sorts: Sort[] = []): Promise<T[]> {
-		return this.repo.findMany(filters, sorts);
+	async getMany(sorts: Sort[] = []): Promise<T[]> {
+		return this.repo.findMany(sorts);
 	}
 }

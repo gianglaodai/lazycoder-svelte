@@ -24,6 +24,7 @@ class PostTypeRepository extends BaseDrizzleRepository<PostType, PostTypeCreate>
 			toEntity,
 			mapCreate: ({ code, name }) => ({ code, name }),
 			mapUpdate: (entity: PostType) => ({ ...entity }),
+			tableName: 'post_types'
 		});
 	}
 
